@@ -2,10 +2,33 @@ const express = require("express");
 require('dotenv').config();
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const jwt = require('jsonwebtoken');
 const port = process.env.PORT || 5000;
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+
+
+// auth
+function verifyJWT(req , res , next){
+  const authHeader = req.headers.authorization;
+  if(!authHeader){
+    return res.status(401).send({message:'unauthorized'});
+  }
+  const token = authHeader.split(' ')[1];
+  jwt.verify(token,process.env.ACCESS_TOKEN,(error , decode)=>{
+    if(error){
+      return res.status(403).send({message:'Forbidden access'})
+    }
+    req.decode = decode;
+    next();
+  })
+  
+}
+
+
+
 // for home page
 app.get("/", (req, res) => {
   res.send("connected bd");
@@ -21,6 +44,7 @@ const client = new MongoClient(uri, {
     try{
       await client.connect();
       const serviceCollection = client.db('geniusCarService').collection('service');
+      const orderCollection = client.db('geniusCarService').collection('order');
       //get services
       app.get('/user', async (req , res)=>{
         const query = {};
@@ -66,6 +90,33 @@ const client = new MongoClient(uri, {
         }
         const result = await serviceCollection.updateOne(query,updateData,options);
         res.send(result);
+      });
+      // order data save in db
+      app.post('/order', async(req,res)=>{
+        const order = req.body;
+        const cursor = await orderCollection.insertOne(order);
+        res.send(cursor);
+      })
+      // Order review 
+      app.get('/order', verifyJWT, async(req , res)=>{
+        const email = req.query.email;
+        const decodeEmail = req.decode.email;
+        if(email === decodeEmail){
+          const query = {email};
+          const cursor = orderCollection.find(query);
+          const order = await cursor.toArray();
+          res.send(order)
+        }else{
+          res.status(403).send({message:'forbidden access'})
+        }
+      })
+      // token 
+      app.post('/login',(req , res) =>{
+        const user = req.body;
+        const accessToken = jwt.sign(user,process.env.ACCESS_TOKEN,{
+          expiresIn:'1d'
+        });
+        res.send(accessToken);
       })
     }finally{
       // await client.close();
