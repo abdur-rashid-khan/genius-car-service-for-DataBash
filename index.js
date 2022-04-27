@@ -46,7 +46,7 @@ const client = new MongoClient(uri, {
       const serviceCollection = client.db('geniusCarService').collection('service');
       const orderCollection = client.db('geniusCarService').collection('order');
       //get services
-      app.get('/services', async (req , res)=>{
+      app.get('/user', async (req , res)=>{
         const query = {};
         const cursor =  serviceCollection.find(query);
         const result = await cursor.toArray();
